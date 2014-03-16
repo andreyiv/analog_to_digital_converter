@@ -28,7 +28,6 @@ def get_input_stream(input_file_path, num_header_lines, delimiter):
 
 def find_min_max(input_data_stream):
 
-    # TODO: Monster comment describing special case
     minimum = next(input_data_stream)[1]
     maximum = minimum
 
@@ -58,40 +57,31 @@ def calculate_thresholds(minimum, maximum, low_thresh_ratio, high_thresh_ratio):
                       high_thresh = analog_range * high_thresh_ratio, \
                       middle = analog_range / 2)
 
-def write_crossings_file(input_data_stream, thresholds, delimiter, num_of_header_lines, output_file):
-    """
-    Writes analog data in input file as digital transitions into output file.
-    @input_file - In: Path to input csv file containing analog data
-    @thresholds - In: Thresholds namedtuple containing thresholds (low, high, middle)
-    @num_of_header_lines - In: Number of header lines before analog data
-    @output_file - In: Path to output csv file to store digital transitions
-    @return - Out: Number of transitions found in input file
-    """
+def write_output_file(input_data_stream, delimiter, thresholds, output_file_path):
+    with open(output_file_path, mode='w', newline='') as output_file:
+        csv_output = csv.writer(output_file, delimiter=delimiter)
 
-    # Going through file getting transitions
-    with open(output_file, mode='w', newline='') as output_data:
-        csv_output = csv.writer(output_data, delimiter=delimiter) # Get csv writer
+        for crossing in threshold_crossings(input_data_stream, thresholds):
+            csv_output.writerow(crossing)
 
-        # Initialize values
-        first_row = next(input_data_stream)
-        analog_value = first_row[1]
-        digital_value = analog_value > thresholds.middle
-        threshold_count = 0
+def threshold_crossings(input_data_stream, thresholds):
 
-        # Write initial row
-        csv_output.writerow([first_row[0], int(digital_value)])
+    # TODO: Monster comment describing special case
+    first_row = next(input_data_stream)
+    analog_value = first_row[1]
+    digital_value = analog_value > thresholds.middle
 
-        # Write the rest of the rows in transitions
-        for input_row in input_data_stream:
-            current_value = input_row[1]
-            if (current_value > thresholds.high_thresh and not digital_value) or \
-               (current_value < thresholds.low_thresh and digital_value):
+    # Write initial row
+    yield [first_row[0], int(digital_value)]
 
-                digital_value = not digital_value
-                csv_output.writerow([input_row[0], int(digital_value)])
-                threshold_count += 1
+    # Write the rest of the rows in transitions
+    for input_row in input_data_stream:
+        current_value = input_row[1]
+        if (current_value > thresholds.high_thresh and not digital_value) or \
+           (current_value < thresholds.low_thresh and digital_value):
 
-    return threshold_count
+            digital_value = not digital_value
+            yield [input_row[0], int(digital_value)]
 
 def get_argumets():
 
@@ -113,6 +103,7 @@ def main():
     input_stream = get_input_stream(input_arguments.input[0], \
                                     input_arguments.headers, \
                                     input_arguments.delimiter)
+
     lim = find_min_max(input_stream)
 
     thresholds = calculate_thresholds(lim.min, lim.max, \
@@ -122,11 +113,10 @@ def main():
                                     input_arguments.headers, \
                                     input_arguments.delimiter)
 
-    threshold_count = write_crossings_file(input_stream, \
-                               thresholds, input_arguments.delimiter, \
-                               input_arguments.headers, input_arguments.output)
+    write_output_file(input_stream, input_arguments.delimiter, \
+                             thresholds, input_arguments.output)
 
-    print("Found {0} transitions in input file".format(threshold_count))
+    # print("Found {0} transitions in input file".format(threshold_count))
 
 
 if __name__ == "__main__":
