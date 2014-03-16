@@ -13,16 +13,9 @@ from collections import namedtuple
 Limits = namedtuple('Limits', ['min', 'max'])
 Thresholds = namedtuple('Thresholds', ['low_thresh', 'high_thresh', 'middle'])
 
-# Get min and max out of the input file
-def find_min_max(input_file_path, num_header_lines, delimiter):
-    """
-    Reads through analog csv file and gets max and min limits
-    @input_file_path - In: Path to input csv file
-    @num_header_lines - In: Number of lines skipped in the beginning of file
-    @delimiter - In: Delimiter used in the csv file
-    @return - Out: Namedtuple containing minimum and maximum values seen in file
-    """
-    # Opening file once to read through
+def get_input_stream(input_file_path, num_header_lines, delimiter):
+
+    # Opening file stream to get data
     with open(input_file_path, mode='r', newline='') as input_data:
         csv_input = csv.reader(input_data, delimiter=delimiter) # Get csv reader
 
@@ -30,19 +23,23 @@ def find_min_max(input_file_path, num_header_lines, delimiter):
         for i in range(num_header_lines):
             next(csv_input)  # Throwing away header data
 
-        # Initializing max and min
-        minimum = float(next(csv_input)[1]) # TODO: provide a good error code for when it's not a float
-        maximum = minimum
-
-        # Finiding max and min
         for row in csv_input:
+            yield (row[0], float(row[1])) # TODO: provide a good error code for when it's not a float
 
-            current_value = float(row[1])
-            if minimum > current_value:
-                minimum = current_value
+def find_min_max(input_data_stream):
+    # TODO: Monster comment describing special case
+    minimum = next(input_data_stream)[1]
+    maximum = minimum
 
-            if maximum < current_value:
-                maximum = current_value
+    # Finiding max and min
+    for row in input_data_stream:
+
+        current_value = float(row[1])
+        if minimum > current_value:
+            minimum = current_value
+
+        if maximum < current_value:
+            maximum = current_value
 
     return Limits(min = minimum, max = maximum)
 
@@ -118,8 +115,10 @@ def main():
     # Parse arguments
     input_arguments = get_argumets()
 
-    lim = find_min_max(input_arguments.input[0], input_arguments.headers, \
+    input_stream = get_input_stream(input_arguments.input[0], \
+                                    input_arguments.headers, \
                                     input_arguments.delimiter)
+    lim = find_min_max(input_stream)
 
     thresholds = calculate_thresholds(lim.min, lim.max, \
                     input_arguments.lratio, input_arguments.hratio)
