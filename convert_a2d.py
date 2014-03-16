@@ -13,15 +13,6 @@ from collections import namedtuple
 Limits = namedtuple('Limits', ['min', 'max'])
 Thresholds = namedtuple('Thresholds', ['low_thresh', 'high_thresh', 'middle'])
 
-# Create argument parser
-parser = argparse.ArgumentParser()
-parser.add_argument("input", nargs='+', help="path to input csv files of analog data, minimum of one")
-parser.add_argument("output", help="path to output csv file of digital transitions")
-parser.add_argument("-d", "--delimiter", default=',', help="specify delimiter used in input and output, ',' is used by default")
-parser.add_argument("-n", "--headers", type=int, default=1, help="number of header rows in input")
-parser.add_argument("-r", "--lratio", type=float, default=1/3, help="ratio of 1 to 0 crossing")
-parser.add_argument("-R", "--hratio", type=float, default=2/3, help="ratio of 0 to 1 crossing")
-
 # Get min and max out of the input file
 def find_min_max(input_file_path, num_header_lines, delimiter):
     """
@@ -110,11 +101,22 @@ def write_crossings_file(input_file, thresholds, delimiter, num_of_header_lines,
 
     return threshold_count
 
+def get_argumets():
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("input", nargs='+', help="path to input csv files of analog data, minimum of one")
+    parser.add_argument("output", help="path to output csv file of digital transitions")
+    parser.add_argument("-d", "--delimiter", default=',', help="specify delimiter used in input and output, ',' is used by default")
+    parser.add_argument("-n", "--headers", type=int, default=1, help="number of header rows in input")
+    parser.add_argument("-r", "--lratio", type=float, default=1/3, help="ratio of 1 to 0 crossing")
+    parser.add_argument("-R", "--hratio", type=float, default=2/3, help="ratio of 0 to 1 crossing")
+
+    return parser.parse_args()
 
 def main():
 
     # Parse arguments
-    input_arguments = parser.parse_args()
+    input_arguments = get_argumets()
 
     lim = find_min_max(input_arguments.input[0], input_arguments.headers, \
                                     input_arguments.delimiter)
