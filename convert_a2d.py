@@ -27,6 +27,7 @@ def get_input_stream(input_file_path, num_header_lines, delimiter):
             yield (row[0], float(row[1])) # TODO: provide a good error code for when it's not a float
 
 def find_min_max(input_data_stream):
+
     # TODO: Monster comment describing special case
     minimum = next(input_data_stream)[1]
     maximum = minimum
@@ -57,7 +58,7 @@ def calculate_thresholds(minimum, maximum, low_thresh_ratio, high_thresh_ratio):
                       high_thresh = analog_range * high_thresh_ratio, \
                       middle = analog_range / 2)
 
-def write_crossings_file(input_file, thresholds, delimiter, num_of_header_lines, output_file):
+def write_crossings_file(input_data_stream, thresholds, delimiter, num_of_header_lines, output_file):
     """
     Writes analog data in input file as digital transitions into output file.
     @input_file - In: Path to input csv file containing analog data
@@ -68,18 +69,12 @@ def write_crossings_file(input_file, thresholds, delimiter, num_of_header_lines,
     """
 
     # Going through file getting transitions
-    with open(input_file, mode='r', newline='') as input_data, \
-         open(output_file, mode='w', newline='') as output_data:
-        csv_input = csv.reader(input_data, delimiter=delimiter) # Get csv reader
+    with open(output_file, mode='w', newline='') as output_data:
         csv_output = csv.writer(output_data, delimiter=delimiter) # Get csv writer
 
-        # Funnel headers over to the output
-        for i in range(num_of_header_lines):
-            csv_output.writerow(next(csv_input))
-
         # Initialize values
-        first_row = next(csv_input)
-        analog_value = float(first_row[1])
+        first_row = next(input_data_stream)
+        analog_value = first_row[1]
         digital_value = analog_value > thresholds.middle
         threshold_count = 0
 
@@ -87,8 +82,8 @@ def write_crossings_file(input_file, thresholds, delimiter, num_of_header_lines,
         csv_output.writerow([first_row[0], int(digital_value)])
 
         # Write the rest of the rows in transitions
-        for input_row in csv_input:
-            current_value = float(input_row[1])
+        for input_row in input_data_stream:
+            current_value = input_row[1]
             if (current_value > thresholds.high_thresh and not digital_value) or \
                (current_value < thresholds.low_thresh and digital_value):
 
@@ -123,7 +118,11 @@ def main():
     thresholds = calculate_thresholds(lim.min, lim.max, \
                     input_arguments.lratio, input_arguments.hratio)
 
-    threshold_count = write_crossings_file(input_arguments.input[0], \
+    input_stream = get_input_stream(input_arguments.input[0], \
+                                    input_arguments.headers, \
+                                    input_arguments.delimiter)
+
+    threshold_count = write_crossings_file(input_stream, \
                                thresholds, input_arguments.delimiter, \
                                input_arguments.headers, input_arguments.output)
 
