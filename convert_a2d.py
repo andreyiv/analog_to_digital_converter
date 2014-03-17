@@ -62,30 +62,40 @@ def write_output_file(transitions, delimiter, output_file_path):
         csv_output = csv.writer(output_file, delimiter=delimiter)
 
         for tr in transitions:
-            csv_output.writerow(tr)
+            csv_output.writerow([tr[0]] + list(map(int, tr[1:])))
 
-def threshold_crossings(input_data_stream, thresholds):
+def get_digital_value(previous_digital_value, current_analog_value, thresholds):
+    if current_analog_value > thresholds.high_thresh:
+        return True
+    elif current_analog_value < thresholds.low_thresh:
+        return False
+    else:
+        return previous_digital_value
 
+
+def threshold_crossings(input_data_streams, thresholds_list):
     # Because a transition is going above a threshold value when
     # current value is 0 or below threshold when current value is 1 and
     # we don't have the current value we need to make an assumption of one.
     # For better or worse, the assumption is:
     # below middle of analog range = 0, above middle = 1
-    first_row = next(input_data_stream)
-    analog_value = first_row[1]
-    digital_value = analog_value > thresholds.middle
+    analog_values = [next(s) for s in input_data_streams]
+    sample_meta = analog_values[0][0] # XXX: I'll regret this later
+    analog_values = [av[1] for av in analog_values]
+    digital_values = [av > th.middle for (av, th) in zip(analog_values, thresholds_list)]
 
-    # Write initial row
-    yield [first_row[0], int(digital_value)]
+    yield [sample_meta] + digital_values
 
-    # Write the rest of the rows in transitions
-    for input_row in input_data_stream:
-        current_value = input_row[1]
-        if (current_value > thresholds.high_thresh and not digital_value) or \
-           (current_value < thresholds.low_thresh and digital_value):
+    while (len(analog_values)): # TODO: Change this to something that actually works
+        cur_digital_values = [get_digital_value(pdv, cav, th) for (pdv, cav, th) in zip(digital_values, analog_values, thresholds_list)]
+        digital_transitions = [pdv ^ cdv for (pdv, cdv) in zip(digital_values, cur_digital_values)]
+        if any(digital_transitions):
+            yield [sample_meta] + cur_digital_values
+            digital_values = cur_digital_values
+        analog_values = [next(s) for s in input_data_streams]
+        sample_meta = analog_values[0][0]
+        analog_values = [av[1] for av in analog_values]
 
-            digital_value = not digital_value
-            yield [input_row[0], int(digital_value)]
 
 def get_argumets():
 
@@ -104,21 +114,21 @@ def main():
     # Parse arguments
     input_arguments = get_argumets()
 
-    input_stream = get_input_stream(input_arguments.input[0], \
+    input_streams = [get_input_stream(fname, \
                                     input_arguments.headers, \
-                                    input_arguments.delimiter)
+                                    input_arguments.delimiter) for fname in input_arguments.input]
 
-    lim = find_min_max(input_stream)
+    limits_list = [find_min_max(stream) for stream in input_streams]
 
-    thresholds = calculate_thresholds(lim.min, lim.max, \
+    thresholds_list = [calculate_thresholds(lim.min, lim.max, \
                                       input_arguments.lratio, \
-                                      input_arguments.hratio)
+                                      input_arguments.hratio) for lim in limits_list]
 
-    input_stream = get_input_stream(input_arguments.input[0], \
+    input_streams = [get_input_stream(fname, \
                                     input_arguments.headers, \
-                                    input_arguments.delimiter)
+                                    input_arguments.delimiter) for fname in input_arguments.input]
 
-    transitions = threshold_crossings(input_stream, thresholds)
+    transitions = threshold_crossings(input_streams, thresholds_list)
 
     write_output_file(transitions, input_arguments.delimiter, \
                                    input_arguments.output)
