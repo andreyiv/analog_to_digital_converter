@@ -80,13 +80,13 @@ def threshold_crossings(input_data_streams, thresholds_list):
     # For better or worse, the assumption is:
     # below middle of analog range = 0, above middle = 1
     analog_values = [next(s) for s in input_data_streams]
-    sample_meta = analog_values[0][0] # XXX: I'll regret this later
+    sample_meta = analog_values[0][0]
     analog_values = [av[1] for av in analog_values]
     digital_values = [av > th.middle for (av, th) in zip(analog_values, thresholds_list)]
 
     yield [sample_meta] + digital_values
 
-    while (len(analog_values)): # TODO: Change this to something that actually works
+    while len(analog_values):
         cur_digital_values = [get_digital_value(pdv, cav, th) for (pdv, cav, th) in zip(digital_values, analog_values, thresholds_list)]
         digital_transitions = [pdv ^ cdv for (pdv, cdv) in zip(digital_values, cur_digital_values)]
         if any(digital_transitions):
