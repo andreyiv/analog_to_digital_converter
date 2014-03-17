@@ -66,7 +66,11 @@ def write_output_file(transitions, delimiter, output_file_path):
 
 def threshold_crossings(input_data_stream, thresholds):
 
-    # TODO: Monster comment describing special case
+    # Because a transition is going above a threshold value when
+    # current value is 0 or below threshold when current value is 1 and
+    # we don't have the current value we need to make an assumption of one.
+    # For better or worse, the assumption is:
+    # below middle of analog range = 0, above middle = 1
     first_row = next(input_data_stream)
     analog_value = first_row[1]
     digital_value = analog_value > thresholds.middle
@@ -107,7 +111,8 @@ def main():
     lim = find_min_max(input_stream)
 
     thresholds = calculate_thresholds(lim.min, lim.max, \
-                    input_arguments.lratio, input_arguments.hratio)
+                                      input_arguments.lratio, \
+                                      input_arguments.hratio)
 
     input_stream = get_input_stream(input_arguments.input[0], \
                                     input_arguments.headers, \
@@ -116,7 +121,7 @@ def main():
     transitions = threshold_crossings(input_stream, thresholds)
 
     write_output_file(transitions, input_arguments.delimiter, \
-                             input_arguments.output)
+                                   input_arguments.output)
 
     # print("Found {0} transitions in input file".format(threshold_count))
 
