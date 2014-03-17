@@ -1,33 +1,37 @@
 """
-Provide analog waveform input, get digitial transitions as output.
+Converts n analog waveforms to digital transitions.
 """
 
 import argparse
 import csv
 from collections import namedtuple
 
-# TODO: Provide limits on ratios
-# TODO: Refactor
-# TODO: Test
+# TODO: Provide error output for header argument too small, streams of different length, and invalid input ratios
+# TODO: Write unit tests
+# TODO: Add progress reporting
 
 Limits = namedtuple('Limits', ['min', 'max'])
 Thresholds = namedtuple('Thresholds', ['low_thresh', 'high_thresh', 'middle'])
 
 def get_input_stream(input_file_path, num_header_lines, delimiter):
-
-    # Opening file stream to get data
+    """
+    Parses a csv file line by line creating a generator with a list with data.
+    """
     with open(input_file_path, mode='r', newline='') as input_data:
-        csv_input = csv.reader(input_data, delimiter=delimiter) # Get csv reader
+        csv_input = csv.reader(input_data, delimiter=delimiter)
 
         # Ignoring header information
         for i in range(num_header_lines):
-            next(csv_input)  # Throwing away header data
+            next(csv_input)
 
         for row in csv_input:
-            yield (row[0], float(row[1])) # TODO: provide a good error code for when it's not a float
+            yield (row[0], float(row[1]))
 
 def find_min_max(input_data_stream):
-
+    """
+    Returns a named tuple of Limits (min, max) by consuming
+    a stream type object.
+    """
     minimum = next(input_data_stream)[1]
     maximum = minimum
 
@@ -45,26 +49,32 @@ def find_min_max(input_data_stream):
 
 def calculate_thresholds(minimum, maximum, low_thresh_ratio, high_thresh_ratio):
     """
-    Calculates thresholds and returns as Threshold namedtuple
-    @minimum - In: Minimum value
-    @maximum - In: Maximum value
-    @low_thresh_ratio - In: Ratio generating low_thresh
-    @high_thresh_ratio - In: Ratio generating high_thresh
-    @return - Out: Threshold namedtuple with low and high_thresh, and middle
+    Returns a namedtuple of threshold data (low_thresh, high_thresh, middle)
+    based on a set of inputs.
     """
     analog_range = maximum - minimum
     return Thresholds(low_thresh = analog_range * low_thresh_ratio, \
                       high_thresh = analog_range * high_thresh_ratio, \
                       middle = analog_range / 2)
 
-def write_output_file(transitions, delimiter, output_file_path):
+def write_output_file(transitions, delimiter, num_streams, output_file_path):
+    """
+    Writes out a stream type object of lists into a csv file.
+    """
     with open(output_file_path, mode='w', newline='') as output_file:
         csv_output = csv.writer(output_file, delimiter=delimiter)
 
+        # Write header
+        csv_output.writerow(['sample'] + list(range(num_streams)))
+        # Continue with the rest of the data
         for tr in transitions:
             csv_output.writerow([tr[0]] + list(map(int, tr[1:])))
 
 def get_digital_value(previous_digital_value, current_analog_value, thresholds):
+    """
+    Outputs current digital value. No mans land between two thresholds means
+    no transition so current value = previous value.
+    """
     if current_analog_value > thresholds.high_thresh:
         return True
     elif current_analog_value < thresholds.low_thresh:
@@ -74,66 +84,91 @@ def get_digital_value(previous_digital_value, current_analog_value, thresholds):
 
 
 def threshold_crossings(input_data_streams, thresholds_list):
+    """
+    Generates threshold crossings/transitions from an analog data stream
+    and a set of threshold values. Works on one or more streams/threshold sets
+    but all need to be the same length.
+    """
+    # Initialize values
+    analog_values = [next(s) for s in input_data_streams]
+    sample_meta = analog_values[0][0] # Sample count or time data
+    # Strip out sample_meta out of analog_values as it's not used
+    analog_values = [av[1] for av in analog_values]
+
     # Because a transition is going above a threshold value when
     # current value is 0 or below threshold when current value is 1 and
     # we don't have the current value we need to make an assumption of one.
     # For better or worse, the assumption is:
     # below middle of analog range = 0, above middle = 1
-    analog_values = [next(s) for s in input_data_streams]
-    sample_meta = analog_values[0][0]
-    analog_values = [av[1] for av in analog_values]
-    digital_values = [av > th.middle for (av, th) in zip(analog_values, thresholds_list)]
+    digital_values = [av > th.middle for (av, th) in \
+                      zip(analog_values, thresholds_list)]
 
+    # Provide initial value (special case)
     yield [sample_meta] + digital_values
 
+    # TODO: Try to roll this /\ initialization step into the main loop \/
+
     while len(analog_values):
-        cur_digital_values = [get_digital_value(pdv, cav, th) for (pdv, cav, th) in zip(digital_values, analog_values, thresholds_list)]
-        digital_transitions = [pdv ^ cdv for (pdv, cdv) in zip(digital_values, cur_digital_values)]
+        cur_digital_values = [get_digital_value(pdv, cav, th) for (pdv, cav, th) in \
+                              zip(digital_values, analog_values, thresholds_list)]
+        digital_transitions = [pdv ^ cdv for (pdv, cdv) in \
+                               zip(digital_values, cur_digital_values)]
         if any(digital_transitions):
             yield [sample_meta] + cur_digital_values
             digital_values = cur_digital_values
+        # Advance the iterators for next step
         analog_values = [next(s) for s in input_data_streams]
         sample_meta = analog_values[0][0]
         analog_values = [av[1] for av in analog_values]
 
 
 def get_argumets():
-
+    """
+    Parse the input arguments.
+    """
     parser = argparse.ArgumentParser()
-    parser.add_argument("input", nargs='+', help="path to input csv files of analog data, minimum of one")
+    parser.add_argument("input", nargs='+', help="path to input csv files of \
+                                        analog data, minimum of one")
     parser.add_argument("output", help="path to output csv file of digital transitions")
-    parser.add_argument("-d", "--delimiter", default=',', help="specify delimiter used in input and output, ',' is used by default")
-    parser.add_argument("-n", "--headers", type=int, default=1, help="number of header rows in input")
-    parser.add_argument("-r", "--lratio", type=float, default=1/3, help="ratio of 1 to 0 crossing")
-    parser.add_argument("-R", "--hratio", type=float, default=2/3, help="ratio of 0 to 1 crossing")
-
+    parser.add_argument("-d", "--delimiter", default=',', \
+                                        help="specify delimiter used in \
+                                        input and output, ',' by default")
+    parser.add_argument("-n", "--headers", type=int, default=1, \
+                                        help="number of header rows in input")
+    parser.add_argument("-r", "--lratio", type=float, default=1/3, \
+                                        help="ratio of 1 to 0 crossing")
+    parser.add_argument("-R", "--hratio", type=float, default=2/3, \
+                                        help="ratio of 0 to 1 crossing")
     return parser.parse_args()
 
 def main():
 
     # Parse arguments
-    input_arguments = get_argumets()
+    args = get_argumets()
 
-    input_streams = [get_input_stream(fname, \
-                                    input_arguments.headers, \
-                                    input_arguments.delimiter) for fname in input_arguments.input]
+    print('Reading input files: {0}.'.format(', '.join(args.input)))
+    # Get list of streams of input data to figure out thresholds
+    input_streams = [get_input_stream(fname, args.headers, \
+                                    args.delimiter) for fname in args.input]
 
+    # Get list of Limits
     limits_list = [find_min_max(stream) for stream in input_streams]
 
+    # Get list of thresholds from inputs by using individual limits
     thresholds_list = [calculate_thresholds(lim.min, lim.max, \
-                                      input_arguments.lratio, \
-                                      input_arguments.hratio) for lim in limits_list]
+                                            args.lratio, args.hratio) \
+                                            for lim in limits_list]
 
-    input_streams = [get_input_stream(fname, \
-                                    input_arguments.headers, \
-                                    input_arguments.delimiter) for fname in input_arguments.input]
+    # Read input one more time to generate transitions from the data
+    input_streams = [get_input_stream(fname, args.headers, args.delimiter) \
+                                            for fname in args.input]
 
+    # Get digital threshold crossings/transitions
     transitions = threshold_crossings(input_streams, thresholds_list)
 
-    write_output_file(transitions, input_arguments.delimiter, \
-                                   input_arguments.output)
-
-    # print("Found {0} transitions in input file".format(threshold_count))
+    # Write out one csv file containing all streams
+    write_output_file(transitions, args.delimiter, len(args.input), args.output)
+    print('Wrote transition data to {0}.'.format(args.output))
 
 
 if __name__ == "__main__":
