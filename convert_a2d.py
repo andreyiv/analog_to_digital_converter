@@ -57,12 +57,12 @@ def calculate_thresholds(minimum, maximum, low_thresh_ratio, high_thresh_ratio):
                       high_thresh = analog_range * high_thresh_ratio, \
                       middle = analog_range / 2)
 
-def write_output_file(input_data_stream, delimiter, thresholds, output_file_path):
+def write_output_file(transitions, delimiter, output_file_path):
     with open(output_file_path, mode='w', newline='') as output_file:
         csv_output = csv.writer(output_file, delimiter=delimiter)
 
-        for crossing in threshold_crossings(input_data_stream, thresholds):
-            csv_output.writerow(crossing)
+        for tr in transitions:
+            csv_output.writerow(tr)
 
 def threshold_crossings(input_data_stream, thresholds):
 
@@ -113,8 +113,10 @@ def main():
                                     input_arguments.headers, \
                                     input_arguments.delimiter)
 
-    write_output_file(input_stream, input_arguments.delimiter, \
-                             thresholds, input_arguments.output)
+    transitions = threshold_crossings(input_stream, thresholds)
+
+    write_output_file(transitions, input_arguments.delimiter, \
+                             input_arguments.output)
 
     # print("Found {0} transitions in input file".format(threshold_count))
 
