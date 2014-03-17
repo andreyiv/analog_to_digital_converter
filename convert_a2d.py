@@ -6,7 +6,8 @@ import argparse
 import csv
 from collections import namedtuple
 
-# TODO: Provide error output for header argument too small, streams of different length, and invalid input ratios
+# TODO: Provide error output for header argument too small, and invalid input ratios
+# TODO: Provide output if input streams are of different length 
 # TODO: Write unit tests
 # TODO: Add progress reporting
 
