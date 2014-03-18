@@ -7,7 +7,8 @@ import csv
 from collections import namedtuple
 
 # TODO: Provide error output for header argument too small, and invalid input ratios
-# TODO: Provide output if input streams are of different length 
+# TODO: Provide output if input streams are of different length
+# TODO: Restyle output file header
 # TODO: Write unit tests
 # TODO: Add progress reporting
 
